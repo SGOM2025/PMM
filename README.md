@@ -1,2 +1,2 @@
-# PPM
+# PMM
 Problema da Mochila Múltipla.
