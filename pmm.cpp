@@ -170,57 +170,193 @@ void simulated_annealing(Solucao& s, const double& TI, const double& TC,
     FIM : ;
 }
 
-/*
-void busca_tabu(Solucao& s, const int& SAMAX, const double& TEM_MAX,
-                         double& TEM_TOT, double& TEM_MEL, int& NUM_SOL){
-        Solucao s_viz, s_atu;
-        clock_t h = clock();
-        TEM_TOT = TEM_MEL = 0.0;
-        NUM_SOL = 1;
-        memcpy(&s_atu, &s, sizeof(Solucao));
+/* META HEURISTICA BUSCA TABU */
 
-}*/
+void atualiza_tabu(int moc, int obj)
+{
+	lista_tabu[0][tabu_pos] = obj;
+	lista_tabu[1][tabu_pos] = moc;
+	tabu_pos = (tabu_pos + 1) % MAX_LISTA;
+}
 
-void grasp(Solucao& s, const double& LRC, const double& TEM_MAX,
-                         double& TEM_TOT, double& TEM_MEL, int& NUM_SOL){
-    Solucao s_viz;
-    clock_t h = clock();
-    TEM_TOT = TEM_MEL = 0.0;
-    NUM_SOL = 1;
-    s.fo = -INT_MAX;
-    while (TEM_TOT < TEM_MAX)
-    {
-        heu_cons_ale_gul(s_viz, LRC);
-        calcular_fo_solucao(s_viz);
-        int buscalocal = rand() % 4;
-        switch(buscalocal){
-            case 0:
-                heu_BL_rand(s_viz, 3 * (num_moc + 1) * num_obj);
-            case 1:
-                heu_BL_MM(s_viz);
-            case 2:
-                heu_BL_PM(s_viz);
-            case 3:
-                heu_BL_PM2(s_viz);
-
+void remover_na_tabu(int moc, int obj){
+    for (int i = 0; i < MAX_LISTA; i++){
+        if (lista_tabu[0][i] == obj && lista_tabu[1][i] == moc){
+            lista_tabu[0][i] = -1;
+            lista_tabu[1][i] = -1;
+            break;
         }
-        calcular_fo_solucao(s_viz);
-        NUM_SOL++;
-        if (s_viz.fo > s.fo)
-        {
-            memcpy(&s, &s_viz, sizeof(Solucao));
-            TEM_MEL = (double)(clock() - h) / CLOCKS_PER_SEC;
-
-            #ifdef DBG
-                printf("FO: %d\tTempo: %.2f\n", s.fo, TEM_MEL);
-            #endif
-
-        }
-
-        TEM_TOT = (double)(clock() - h) / CLOCKS_PER_SEC;
     }
 }
 
+int procura_na_tabu(int moc, int obj)
+{
+	for (int i = 0; i < MAX_LISTA; i++)
+	{
+		if (lista_tabu[0][i] == obj && lista_tabu[1][i] == moc)
+			return 1;
+	}
+	return 0;
+}
+
+void busca_tabu(Solucao& s, const double& TEM_MAX,
+                double& TEM_TOT, double& TEM_MEL, int& NUM_SOL)
+{
+	for (int i = 0; i < MAX_LISTA; i++)
+	{
+		lista_tabu[0][i] = -1;
+		lista_tabu[1][i] = -1;
+	}
+
+	tabu_pos = 0;
+
+	Solucao s_viz, s_melhor;
+	clock_t h = clock();
+	TEM_TOT = TEM_MEL = 0.0;
+	NUM_SOL = 1;
+	memcpy(&s_viz, &s, sizeof(Solucao));
+
+	while (TEM_TOT < TEM_MAX)
+	{
+		heu_BL_PM_TABU(s);
+		
+		if(s.fo > s_viz.fo){
+		    memcpy(&s_viz, &s, sizeof(Solucao));
+		    
+		    TEM_MEL = (double)(clock() - h) / CLOCKS_PER_SEC;
+
+            #ifdef DBG
+                printf("FO: %d\tTempo: %.2f\n", s_viz.fo, TEM_MEL);
+            #endif
+		}
+
+        NUM_SOL++;
+		TEM_TOT = (double)(clock() - h) / CLOCKS_PER_SEC;
+	}
+	
+	memcpy(&s, &s_viz, sizeof(Solucao));	
+}
+
+void busca_tabu_melhorada(Solucao& s, const double& TEM_MAX,
+                double& TEM_TOT, double& TEM_MEL, int& NUM_SOL)
+{
+	for (int i = 0; i < MAX_LISTA; i++)
+	{
+		lista_tabu[0][i] = -1;
+		lista_tabu[1][i] = -1;
+	}
+	
+	tabu_pos = 0;
+
+	Solucao s_atual;
+    Solucao s_melhor_global;
+    Solucao s_viz;
+
+    memcpy(&s_atual, &s, sizeof(Solucao));
+    memcpy(&s_melhor_global, &s, sizeof(Solucao));
+    
+	clock_t h = clock();
+	TEM_TOT = TEM_MEL = 0.0;
+	NUM_SOL = 1;
+    
+	while (TEM_TOT < TEM_MAX)
+	{
+		int melhor_vizinho_fo = -INT_MAX;
+        int melhor_movimento_obj = -1;
+        int melhor_movimento_moc_destino = -1;
+        int moc_origem_do_melhor_movimento = -1;
+		   
+		for (int j = 0; j < num_obj; j++)
+            {
+                int moc_ori = s_atual.vet_sol[j];
+        
+                for (int i = -1; i < num_moc; i++)
+                {
+                    if (i == moc_ori) continue; 
+        
+                    memcpy(&s_viz, &s_atual, sizeof(Solucao));
+                    s_viz.vet_sol[j] = i;
+                    calcular_fo_solucao(s_viz);
+                    if (!procura_na_tabu(moc_ori, j) || s_viz.fo > s_melhor_global.fo)
+                    {
+                        if (s_viz.fo > melhor_vizinho_fo)
+                        {
+                            melhor_vizinho_fo = s_viz.fo;
+                            melhor_movimento_obj = j;
+                            melhor_movimento_moc_destino = i;
+                            moc_origem_do_melhor_movimento = moc_ori;
+                        }
+                    }
+                }
+            }
+        
+        if (melhor_movimento_obj != -1) {
+
+            atualiza_tabu(moc_origem_do_melhor_movimento, melhor_movimento_obj);
+        
+            s_atual.vet_sol[melhor_movimento_obj] = melhor_movimento_moc_destino;
+            calcular_fo_solucao(s_atual);
+        }
+		  
+        if (s_viz.fo > s_melhor_global.fo) {
+            memcpy(&s_melhor_global, &s_viz, sizeof(Solucao));
+            TEM_MEL = (double)(clock() - h) / CLOCKS_PER_SEC;
+
+            #ifdef DBG
+                printf("FO: %d\tTempo: %.2f\n", s_melhor_global.fo, TEM_MEL);
+            #endif
+        }
+		
+        NUM_SOL++;
+		TEM_TOT = (double)(clock() - h) / CLOCKS_PER_SEC;
+	}
+	
+	memcpy(&s, &s_melhor_global, sizeof(Solucao));
+}
+
+/* META HEURISTICA GRASP */
+
+void grasp(Solucao& s, const double& LRC, const double& TEM_MAX,
+           double& TEM_TOT, double& TEM_MEL, int& NUM_SOL)
+{
+	Solucao s_viz;
+	
+	clock_t h = clock();
+	TEM_TOT = TEM_MEL = 0.0;
+	NUM_SOL = 1;
+	s.fo = -INT_MAX;
+	while (TEM_TOT < TEM_MAX)
+	{
+		heu_cons_ale_gul(s_viz, LRC);
+		calcular_fo_solucao(s_viz);
+		int buscalocal = rand() % 4;
+		switch(buscalocal)
+		{
+		case 0:
+			heu_BL_rand(s_viz, 3 * (num_moc + 1) * num_obj);
+		case 1:
+			heu_BL_MM(s_viz);
+		case 2:
+			heu_BL_PM(s_viz);
+		case 3:
+			heu_BL_PM2(s_viz);
+		}
+		
+		if (s_viz.fo > s.fo)
+		{
+			memcpy(&s, &s_viz, sizeof(Solucao));
+			TEM_MEL = (double)(clock() - h) / CLOCKS_PER_SEC;
+
+            #ifdef DBG
+			    printf("FO: %d\tTempo: %.2f\n", s.fo, TEM_MEL);
+            #endif
+		}
+		
+		NUM_SOL++;
+
+		TEM_TOT = (double)(clock() - h) / CLOCKS_PER_SEC;
+	}
+}
 
 void heu_BL_rand(Solucao& s, const int& iter)
 {
