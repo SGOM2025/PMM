@@ -450,6 +450,41 @@ void heu_BL_PM(Solucao& s)
     s.fo = mel_fo;
 }
 
+void heu_BL_PM_TABU(Solucao& s)
+{
+    Solucao melhor_global;
+    memcpy(&melhor_global, &s, sizeof(Solucao));
+    int mel_fo = -INT_MAX;
+    INICIO : ;
+	for (int j = 0; j < num_obj; j++)
+	{
+		int moc_ori = s.vet_sol[j];
+		int fo_ori = s.fo;
+		for (int i = -1; i < num_moc; i++)
+		{
+			s.vet_sol[j] = i;
+			calcular_fo_solucao(s);
+			if (s.fo > mel_fo && !procura_na_tabu(i, j))
+			{
+			     mel_fo = s.fo;
+			     atualiza_tabu(i, j);
+				 goto INICIO;
+			} else if(s.fo > melhor_global.fo && procura_na_tabu(i, j)){
+			     mel_fo = s.fo;
+			     // remover_na_tabu
+			     remover_na_tabu(i, j);
+			    // goto INICIO;
+			}
+			else
+			{
+				s.vet_sol[j] = moc_ori;
+				s.fo = fo_ori;
+			}
+		}
+	}
+	s.fo = mel_fo;
+}
+
 void heu_BL_PM2(Solucao& s)
 {
     int vet_aux[MAX_OBJ];

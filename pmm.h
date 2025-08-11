@@ -46,6 +46,7 @@ void grasp(Solucao& s, const double& LRC, const double& TEM_MAX,
 void heu_BL_rand(Solucao& s, const int& iter);
 void heu_BL_MM(Solucao& s);
 void heu_BL_PM(Solucao& s);
+void heu_BL_PM_TABU(Solucao& s);
 void heu_BL_PM2(Solucao& s);
 
 void heu_cons_ale(Solucao& s);
